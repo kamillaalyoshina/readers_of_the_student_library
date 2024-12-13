@@ -159,6 +159,30 @@ class BookDetailsWindow(QWidget):  # Окно с подробной информ
         # Загружаем информацию о книге
         self.load_book_details()
 
+    @staticmethod
+    def log_operation(operation, id_librarian):
+        desktop_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
+        db_folder_path = os.path.join(desktop_path, "Library")
+        db_path = os.path.join(db_folder_path, "library.db")
+
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            cursor.execute(
+                "INSERT INTO Log (operation, id_librarian) VALUES (?, ?)",
+                (operation, id_librarian)
+            )
+
+            conn.commit()
+
+        except sqlite3.Error as e:
+            print(f"Ошибка записи логов: {e}")
+
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
     def load_book_details(self):
         self.setUpdatesEnabled(False)
         try:
@@ -250,7 +274,7 @@ class BookDetailsWindow(QWidget):  # Окно с подробной информ
         self.book_condition_input.setVisible(True)
         self.return_button_confirm.setVisible(True)
 
-    def return_book(self):
+    def return_book(self, librarian_id):
         # Получаем введённые данные
         reader_if = self.reader_if_input.text().strip()
         return_date = self.return_date_input.text().strip()
@@ -333,12 +357,13 @@ class BookDetailsWindow(QWidget):  # Окно с подробной информ
             if days_late > 30:
                 cursor.execute("UPDATE readers SET debt = 0 WHERE id_reader = ?",(reader_id,))
             conn.commit()
+            self.log_operation("Возврат книги", self.librarian_id)
             QMessageBox.information(self, "Успех", "Книга успешно возвращена!")
             self.close()
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка: {str(e)}")
 
-    def issue_book(self):
+    def issue_book(self, librarian_id):
         # Получаем введённые данные
         surname = self.surname_input.text().strip()
         name = self.name_input.text().strip()
@@ -418,6 +443,7 @@ class BookDetailsWindow(QWidget):  # Окно с подробной информ
                 VALUES (?, ?, ?, ?)
             """, (reader_id, self.book_id, self.librarian_id, issue_date))
             conn.commit()
+            self.log_operation("Выдача книги", self.librarian_id)
             QMessageBox.information(self, "Успех", "Книга успешно выдана!")
             self.close()
         except sqlite3.Error as err:

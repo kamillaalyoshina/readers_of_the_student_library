@@ -6,8 +6,9 @@ import os
 from docx import Document
 
 class DebtReportWindow(QWidget):
-    def __init__(self):
+    def __init__(self, librarian_id):
         super().__init__()
+        self.librarian_id = librarian_id
         self.setWindowTitle("Отчёт по долгам читателей")
         self.setFixedSize(700, 500)
         # Создание виджетов
@@ -36,7 +37,32 @@ class DebtReportWindow(QWidget):
         layout.addWidget(self.export_to_word_button)
         self.setLayout(layout)
 
-    def generate_report(self):
+    @staticmethod
+    def log_operation(operation, id_librarian):
+        desktop_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
+        db_folder_path = os.path.join(desktop_path, "Library")
+        db_path = os.path.join(db_folder_path, "library.db")
+
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            cursor.execute(
+                "INSERT INTO Log (operation, id_librarian) VALUES (?, ?)",
+                (operation, id_librarian)
+            )
+
+            conn.commit()
+
+        except sqlite3.Error as e:
+            print(f"Ошибка записи логов: {e}")
+
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
+    def generate_report(self, librarian_id):
+        self.log_operation("Генерация отчёта", self.librarian_id)
         try:
             desktop_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
             db_folder_path = os.path.join(desktop_path, "Library")
@@ -93,7 +119,7 @@ class DebtReportWindow(QWidget):
             # Ловим все остальные ошибки
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка: {str(e)}")
 
-    def export_to_word(self):
+    def export_to_word(self, librarian_id):
         # Получаем текст из QTextEdit (генерированный отчёт)
         report_text = self.text_edit_report.toPlainText()
         # Проверяем, если отчёт пустой
@@ -136,5 +162,6 @@ class DebtReportWindow(QWidget):
             # Получаем имя файла для отображения в сообщении
             file_name = os.path.basename(save_path)
             QMessageBox.information(self, "Успех", f"Отчёт успешно экспортирован в Word как '{file_name}' в папку '{folder_path}'")
+            self.log_operation("Сохранение диаграммы в формате .docx", self.librarian_id)
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении файла: {str(e)}")

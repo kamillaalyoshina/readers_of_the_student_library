@@ -4,10 +4,147 @@ from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt, QStandardPaths
 import os
 
+
 class LoginWindow(QWidget):  # Окно для авторизации
     def __init__(self):
         super().__init__()
+        self.create_database()
         self.initUI()
+
+    @staticmethod
+    def create_database():
+        try:
+            # Получение пути к рабочему столу
+            desktop_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
+            db_folder_path = os.path.join(desktop_path, "Library")
+            db_path = os.path.join(db_folder_path, "library.db")
+
+            # Флаг для проверки, нужно ли показывать сообщение
+            show_message = False
+
+            # Создание папки, если она не существует
+            if not os.path.exists(db_folder_path):
+                os.makedirs(db_folder_path)
+                show_message = True
+
+            # Проверка существования файла базы данных
+            if not os.path.exists(db_path):
+                show_message = True
+
+            # Подключение к базе данных
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            # Создание таблицы "Библиотекари"
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Librarians (
+                    id_librarian INTEGER PRIMARY KEY AUTOINCREMENT,
+                    surname TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    otchestvo TEXT,
+                    number TEXT(11),
+                    login TEXT(20) NOT NULL,
+                    password TEXT(20) NOT NULL
+                )
+            """)
+
+            # Создание таблицы "Читатели"
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Readers (
+                    id_reader INTEGER PRIMARY KEY AUTOINCREMENT,
+                    surname TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    otchestvo TEXT,
+                    number TEXT(11),
+                    debt BOOLEAN NOT NULL DEFAULT 0
+                )
+            """)
+
+            # Создание таблицы "Книги"
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Books (
+                    id_book INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    surname TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    otchestvo TEXT,
+                    date_publication DATE,
+                    price REAL NOT NULL,
+                    status TEXT CHECK(status IN ('хорошее', 'плохое', 'выдана')) NOT NULL
+                )
+            """)
+
+            # Создание таблицы "Учётные карточки"
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Records (
+                    id_record INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_reader INTEGER,
+                    id_book INTEGER,
+                    id_librarian INTEGER,
+                    date_loan DATE NOT NULL,
+                    date_return DATE,
+                    fine REAL DEFAULT 0,
+                    FOREIGN KEY (id_reader) REFERENCES Readers(id_reader),
+                    FOREIGN KEY (id_book) REFERENCES Books(id_book),
+                    FOREIGN KEY (id_librarian) REFERENCES Librarians(id_librarian)
+                )
+            """)
+
+            # Создание таблицы "Log"
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Log (
+                    id_log INTEGER PRIMARY KEY AUTOINCREMENT,
+                    operation TEXT NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    id_librarian INTEGER,
+                    FOREIGN KEY (id_librarian) REFERENCES Librarians(id_librarian)
+                )
+            """)
+
+            # Сохранение изменений
+            conn.commit()
+
+            # Показ сообщения только если база данных была создана
+            if show_message:
+                QMessageBox.information(
+                    None,
+                    "База данных создана",
+                    f"База данных успешно создана в папке:\n{db_folder_path}\n"
+                    "Необходимо заполнить базу данных перед началом работы.",
+                    QMessageBox.StandardButton.Ok
+                )
+
+        except sqlite3.Error as e:
+            print(f"Ошибка создания базы данных: {e}")
+
+        finally:
+            # Закрытие соединения
+            if 'conn' in locals():
+                conn.close()
+
+    @staticmethod
+    def log_operation(operation, id_librarian):
+        desktop_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
+        db_folder_path = os.path.join(desktop_path, "Library")
+        db_path = os.path.join(db_folder_path, "library.db")
+
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            cursor.execute(
+                "INSERT INTO Log (operation, id_librarian) VALUES (?, ?)",
+                (operation, id_librarian)
+            )
+
+            conn.commit()
+
+        except sqlite3.Error as e:
+            print(f"Ошибка записи логов: {e}")
+
+        finally:
+            if 'conn' in locals():
+                conn.close()
 
     def initUI(self):
         self.setWindowTitle('Авторизация')
@@ -90,6 +227,7 @@ class LoginWindow(QWidget):  # Окно для авторизации
                 QMessageBox.information(self, 'Успех', 'Вы вошли в систему!', QMessageBox.StandardButton.Ok)
                 # Передаем в open_main_window параметры librarian_id и librarian_name
                 self.open_main_window(librarian_id, librarian_name)
+                self.log_operation("Авторизация", librarian_id)
                 self.close()  # Закрываем окно входа
             else:
                 QMessageBox.warning(self, 'Ошибка', 'Неверный логин или пароль.', QMessageBox.StandardButton.Ok)

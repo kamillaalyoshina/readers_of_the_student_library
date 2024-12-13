@@ -288,6 +288,7 @@ class MainWindow(QMainWindow):
             self.load_books()  # Без параметров для загрузки всех книг
 
     def show_book_details_window(self, item):
+        from book_details_window import BookDetailsWindow
         book_id = item.data(Qt.ItemDataRole.UserRole)
         # Если окно уже существует, обновим его данные
         if self.book_details_window and self.book_details_window.isVisible():
@@ -298,15 +299,18 @@ class MainWindow(QMainWindow):
             self.book_details_window.show()
 
     def show_reader_records(self):
-        self.reader_records_window = ReaderRecordsWindow()
+        from reader_records_window import ReaderRecordsWindow
+        self.reader_records_window = ReaderRecordsWindow(self.librarian_id)
         self.reader_records_window.show()
 
     def show_attendance_report(self):
-        self.report_window = AttendanceReportWindow()
+        from attendance_report_window import AttendanceReportWindow
+        self.report_window = AttendanceReportWindow(self.librarian_id)
         self.report_window.show()
 
     def show_debt_report(self):
-        self.reporti_window = DebtReportWindow()
+        from debt_report_window import DebtReportWindow
+        self.reporti_window = DebtReportWindow(self.librarian_id)
         self.reporti_window.show()
 
 if __name__ == '__main__':

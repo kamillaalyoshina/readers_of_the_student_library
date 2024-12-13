@@ -4,8 +4,9 @@ from PyQt6.QtCore import Qt, QStandardPaths
 import os
 
 class ReaderRecordsWindow(QWidget):  # Окно для учётных карточек
-    def __init__(self):
+    def __init__(self, librarian_id):
         super().__init__()
+        self.librarian_id = librarian_id
         self.setWindowTitle('Учётные карточки')
         self.setGeometry(10, 175, 1500, 600)
         self.layout = QVBoxLayout(self)
@@ -61,6 +62,30 @@ class ReaderRecordsWindow(QWidget):  # Окно для учётных карто
                 text-align: center; }""")
         self.layout.addWidget(self.table)
         self.load_reader_records()  # Загружаем все записи по умолчанию
+
+    @staticmethod
+    def log_operation(operation, id_librarian):
+        desktop_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
+        db_folder_path = os.path.join(desktop_path, "Library")
+        db_path = os.path.join(db_folder_path, "library.db")
+
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            cursor.execute(
+                "INSERT INTO Log (operation, id_librarian) VALUES (?, ?)",
+                (operation, id_librarian)
+            )
+
+            conn.commit()
+
+        except sqlite3.Error as e:
+            print(f"Ошибка записи логов: {e}")
+
+        finally:
+            if 'conn' in locals():
+                conn.close()
 
     def load_reader_records(self, reader_id=None):
         # Загружает учётные карточки в таблицу. Если передан reader_id, фильтрует по нему.

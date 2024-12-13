@@ -7,8 +7,9 @@ import xlsxwriter
 import os
 
 class AttendanceReportWindow(QWidget):
-    def __init__(self):
+    def __init__(self, librarian_id):
         super().__init__()
+        self.librarian_id = librarian_id
         self.setWindowTitle("Отчёт по посещаемости")
         self.setFixedSize(400, 340)
         # Макет для виджетов
@@ -105,7 +106,32 @@ class AttendanceReportWindow(QWidget):
         # Диаграмма для отображения посещаемости
         self.chart_view = None
 
-    def generate_attendance_report(self):
+    @staticmethod
+    def log_operation(operation, id_librarian):
+        desktop_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DesktopLocation)
+        db_folder_path = os.path.join(desktop_path, "Library")
+        db_path = os.path.join(db_folder_path, "library.db")
+
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            cursor.execute(
+                "INSERT INTO Log (operation, id_librarian) VALUES (?, ?)",
+                (operation, id_librarian)
+            )
+
+            conn.commit()
+
+        except sqlite3.Error as e:
+            print(f"Ошибка записи логов: {e}")
+
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
+    def generate_attendance_report(self, librarian_id):
+        self.log_operation("Генерация диаграммы", self.librarian_id)
         self.setMinimumSize(660, 600)
         self.setMaximumSize(1200, 900)
         try:
@@ -190,7 +216,8 @@ class AttendanceReportWindow(QWidget):
             print(f"Ошибка при работе с базой данных: {e}")
             return 0, 0
 
-    def save_chart_image(self):
+    def save_chart_image(self, librarian_id):
+        self.log_operation("Сохранение диаграммы в формате .png", self.librarian_id)
         if self.chart_view:
             try:
                 # Обновляем виджет диаграммы
@@ -262,7 +289,8 @@ class AttendanceReportWindow(QWidget):
                 msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
                 msg_box.exec()
 
-    def export_to_excel_with_chart(self):
+    def export_to_excel_with_chart(self, librarian_id):
+        self.log_operation("Сохранение диаграммы в формате .xlsx", self.librarian_id)
         try:
             year = self.year_combo.currentText()
             month = self.month_combo.currentIndex() + 1
